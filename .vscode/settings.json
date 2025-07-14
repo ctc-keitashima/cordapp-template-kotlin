@@ -1,0 +1,8 @@
+{
+  "kotlinLSP.jrePathToRunLsp": "/usr/lib/jvm/java-17-amazon-corretto",
+  "[kotlin]": {
+      "editor.defaultFormatter": "cstef.kotlin-formatter",
+      "editor.formatOnSave": true
+  },
+  "kotlin-formatter.ktlintPath": "/usr/local/bin/ktlint" 
+}
