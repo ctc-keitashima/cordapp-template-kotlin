@@ -12,14 +12,15 @@ import java.time.Instant
 import java.util.*
 
 
-// Data class to hold the Flow results.
-// The ChatState(s) cannot be returned directly as the JsonMarshallingService can only serialize simple classes
-// that the underlying Jackson serializer recognises, hence creating a DTO style object which consists only of Strings
-// and a UUID. It is possible to create custom serializers for the JsonMarshallingService, but this beyond the scope
-// of this simple example.
+// フローの結果を保持するデータクラス。
+// ChatStateは直接返すことができません。なぜなら、JsonMarshallingServiceは、
+// 基盤となるJacksonシリアライザーが認識する単純なクラスしかシリアライズできないためです。
+// したがって、文字列とUUIDのみで構成されるDTOスタイルのオブジェクトを作成します。
+// JsonMarshallingService用にカスタムシリアライザーを作成することも可能ですが、
+// この単純な例の範囲を超えています。
 data class ChatStateResults(val id: UUID, val chatName: String,val messageFromName: String, val message: String)
 
-// See Chat CorDapp Design section of the getting started docs for a description of this flow.
+// このフローの説明については、入門ドキュメントのChat CorDapp Designセクションを参照してください。
 class ListChatsFlow : ClientStartableFlow {
 
     private companion object {
@@ -29,16 +30,16 @@ class ListChatsFlow : ClientStartableFlow {
     @CordaInject
     lateinit var jsonMarshallingService: JsonMarshallingService
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API.
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします。
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
     @Suspendable
     override fun call(requestBody: ClientRequestBody): String {
 
-        log.info("ListChatsFlow.call() called")
+        log.info("ListChatsFlow.call() が呼び出されました")
 
-        // Queries the VNode's vault for unconsumed states and converts the result to a serializable DTO.
+        // VNodeの保管庫で未消費の状態を照会し、結果をシリアライズ可能なDTOに変換します。
         val states = ledgerService.findUnconsumedStatesByExactType(ChatState::class.java, 100, Instant.now()).results
         val results = states.map {
             ChatStateResults(
@@ -47,13 +48,13 @@ class ListChatsFlow : ClientStartableFlow {
                 it.state.contractState.messageFrom.toString(),
                 it.state.contractState.message) }
 
-        // Uses the JsonMarshallingService's format() function to serialize the DTO to Json.
+        // JsonMarshallingServiceのformat()関数を使用してDTOをJsonにシリアライズします。
         return jsonMarshallingService.format(results)
     }
 }
 
 /*
-RequestBody for triggering the flow via REST:
+REST経由でフローをトリガーするためのRequestBody：
 {
     "clientRequestId": "list-1",
     "flowClassName": "com.r3.developers.cordapptemplate.utxoexample.workflows.ListChatsFlow",

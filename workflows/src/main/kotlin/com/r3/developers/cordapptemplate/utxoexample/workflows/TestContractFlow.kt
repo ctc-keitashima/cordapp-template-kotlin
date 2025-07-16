@@ -32,7 +32,7 @@ class TestContractFlow: ClientStartableFlow  {
     @CordaInject
     lateinit var memberLookup: MemberLookup
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
@@ -48,7 +48,7 @@ class TestContractFlow: ClientStartableFlow  {
 
         val results = mutableMapOf<String, String>()
 
-        log.info("TestContractFlow.call() called")
+        log.info("TestContractFlow.call() が呼び出されました")
 
         class FakeCommand : Command
 
@@ -58,13 +58,12 @@ class TestContractFlow: ClientStartableFlow  {
             val myInfo = memberLookup.myInfo()
 
             val otherMember = memberLookup.lookup(MemberX500Name.parse(flowArgs.otherMember)) ?:
-            throw CordaRuntimeException("MemberLookup can't find otherMember specified in flow arguments.")
+            throw CordaRuntimeException("MemberLookupがフロー引数で指定されたotherMemberを見つけられません。")
 
-            // Obtain the Notary name and public key.
+            // 公証人の名前と公開鍵を取得します。
             val notary = notaryLookup.notaryServices.first()
 
-            // Create a well formed transaction with an output State which can be referenced
-            // as an input StateRef in the tests
+            // テストで入力StateRefとして参照できる出力Stateを持つ整形式のトランザクションを作成します
             lateinit var inputStateRef: StateRef
             lateinit var chatId: UUID
 
@@ -92,16 +91,16 @@ class TestContractFlow: ClientStartableFlow  {
                 flowEngine.subFlow(FinalizeChatSubFlow(signedTransaction, otherMember.name))
 
             } catch (e:Exception) {
-                throw CordaRuntimeException("Set up transaction could not be created because of exception: ${e.message}")
+                throw CordaRuntimeException("セットアップトランザクションは例外のために作成できませんでした： ${e.message}")
             }
 
 
 
 
-            // *************   START TESTS ****************
+            // *************   テスト開始 ****************
 
-            // Multiple Commands not permitted
-            results["Multiple Commands not permitted"] = try {
+            // 複数のコマンドは許可されていません
+            results["複数のコマンドは許可されていません"] = try {
                 val chatState = ChatState(
                     chatName = "DummyChat",
                     messageFrom = myInfo.name,
@@ -120,20 +119,20 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
 
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("Requires a single command.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("単一のコマンドが必要です。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // ChatState with 3 Participants not permitted
-            results["ChatState with 3 Participants not permitted"]  = try {
+            // 3人の参加者を持つChatStateは許可されていません
+            results["3人の参加者を持つChatStateは許可されていません"]  = try {
 
                 val chatState = ChatState(
                     chatName = "DummyChat",
@@ -152,20 +151,20 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
 
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("The output state should have two and only two participants.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("出力状態には2人の参加者のみが必要です。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // Input State on Create not permitted
-            results["Input State on Create not permitted"] = try {
+            // 作成時の入力状態は許可されていません
+            results["作成時の入力状態は許可されていません"] = try {
                 val chatState = ChatState(
                     chatName = "DummyChat",
                     messageFrom = myInfo.name,
@@ -184,25 +183,24 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
 
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Create there should be no input states.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがCreateの場合、入力状態は存在しないはずです。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
-            // Zero output States on Create not permitted
+            // 作成時に出力状態がゼロであることは許可されていません
 
-                // Test omitted as it would fail on
-                // "The output state should have two and only two participants." first
+                // 「出力状態には2人の参加者のみが必要です。」で最初に失敗するため、テストは省略されました
 
 
-            // Two output States on Create not permitted
-            results["Two output States on Create not permitted"] = try {
+            // 作成時に2つの出力状態を持つことは許可されていません
+            results["作成時に2つの出力状態を持つことは許可されていません"] = try {
                 val chatState = ChatState(
                     chatName = "DummyChat",
                     messageFrom = myInfo.name,
@@ -221,19 +219,19 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Create there should be one and only one output state.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがCreateの場合、出力状態は1つだけである必要があります。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // Zero input State on Update not permitted
-            results["Zero input State on Update not permitted"] = try {
+            // 更新時にゼロの入力状態は許可されていません
+            results["更新時にゼロの入力状態は許可されていません"] = try {
 
                 val chatState = ChatState(
                     id = chatId,
@@ -253,22 +251,22 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
 
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Update there should be one and only one input state.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがUpdateの場合、入力状態は1つだけである必要があります。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // Two Input State on Update not permitted
-            results["Two Input State on Update not permitted"] = try {
+            // 更新時に2つの入力状態は許可されていません
+            results["更新時に2つの入力状態は許可されていません"] = try {
 
-                log.info("MB: test change")
+                log.info("MB: テスト変更")
                 val chatState = ChatState(
                     id = chatId,
                     chatName = "DummyChat",
@@ -289,26 +287,25 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
 
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Update there should be one and only one input state.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがUpdateの場合、入力状態は1つだけである必要があります。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // Zero output States on Update not permitted
+            // 更新時にゼロの出力状態は許可されていません
 
-                // Test omitted as it would fail on
-                // "The output state should have two and only two participants." first
+                // 「出力状態には2人の参加者のみが必要です。」で最初に失敗するため、テストは省略されました
 
 
-            // Two output States on Update not permitted
-            results["Two output States on Update not permitted"] = try {
+            // 更新時に2つの出力状態は許可されていません
+            results["更新時に2つの出力状態は許可されていません"] = try {
                 val chatState = ChatState(
                     id = chatId,
                     chatName = "DummyChat",
@@ -329,19 +326,19 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Update there should be one and only one output state.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがUpdateの場合、出力状態は1つだけである必要があります。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // On Update id must not change
-            results["On Update id must not change"] = try {
+            // 更新時にIDは変更してはなりません
+            results["更新時にIDは変更してはなりません"] = try {
                 val chatState = ChatState(
                     id = UUID.randomUUID(),
                     chatName = "DummyChat",
@@ -361,19 +358,19 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Update id must not change")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがUpdateの場合、IDは変更してはなりません")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // On Update chatName must not change
-            results["On Update chatName must not change"] = try {
+            // 更新時にchatNameは変更してはなりません
+            results["更新時にchatNameは変更してはなりません"] = try {
                 val chatState = ChatState(
                     id = chatId,
                     chatName = "DummyChat Name has changed",
@@ -393,19 +390,19 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Update chatName must not change.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがUpdateの場合、chatNameは変更してはなりません。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // On Update participants must not change
-            results["On Update participants must not change"] = try {
+            // 更新時に参加者は変更してはなりません
+            results["更新時に参加者は変更してはなりません"] = try {
                 val chatState = ChatState(
                     id = chatId,
                     chatName = "DummyChat",
@@ -425,19 +422,19 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("When command is Update participants must not change.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("コマンドがUpdateの場合、参加者は変更してはなりません。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
 
-            // FakeCommand not permitted
-            results["FakeCommand not permitted"] = try {
+            // FakeCommandは許可されていません
+            results["FakeCommandは許可されていません"] = try {
                 val chatState = ChatState(
                     chatName = "DummyChat",
                     messageFrom = myInfo.name,
@@ -446,7 +443,7 @@ class TestContractFlow: ClientStartableFlow  {
                 )
 
 
-                // Use UTXOTransactionBuilder to build up the draft transaction.
+                // UTXOTransactionBuilderを使用してドラフトトランザクションを作成します。
                 val txBuilder = ledgerService.createTransactionBuilder()
                     .setNotary(notary.name)
                     .setTimeWindowBetween(Instant.now(), Instant.now().plusMillis(Duration.ofDays(1).toMillis()))
@@ -457,14 +454,14 @@ class TestContractFlow: ClientStartableFlow  {
                 @Suppress("DEPRECATION", "UNUSED_VARIABLE")
                 val signedTransaction = txBuilder.toSignedTransaction()
 
-                "Fail"
+                "失敗"
 
             } catch (e:Exception) {
-                val exceptionMessage =  e.message ?: "No exception message"
-                if (exceptionMessage.contains("Command not allowed.")) {
-                    "Pass" }
+                val exceptionMessage =  e.message ?: "例外メッセージなし"
+                if (exceptionMessage.contains("許可されていないコマンドです。")) {
+                    "成功" }
                 else {
-                    "Contract failed but with a different Exception: ${e.message}"
+                    "契約は失敗しましたが、別の例外が発生しました： ${e.message}"
                 }
             }
 
@@ -472,9 +469,9 @@ class TestContractFlow: ClientStartableFlow  {
 
             return results.toString()
 
-            // Catch any exceptions, log them and rethrow the exception.
+            // 例外をキャッチし、ログに記録して例外を再スローします。
         } catch (e: Exception) {
-            log.warn("Failed to process utxo flow for request body '$requestBody' because:'${e.message}'")
+            log.warn("リクエストボディ '$requestBody' のutxoフローの処理に失敗しました。理由：'${e.message}'")
             throw e
         }
     }

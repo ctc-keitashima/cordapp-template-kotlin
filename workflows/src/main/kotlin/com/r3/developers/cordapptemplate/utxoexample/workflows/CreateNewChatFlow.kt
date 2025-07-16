@@ -14,10 +14,10 @@ import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
 
-// A class to hold the deserialized arguments required to start the flow.
+// フローを開始するために必要な、デシリアライズされた引数を保持するクラス。
 data class CreateNewChatFlowArgs(val chatName: String, val message: String, val otherMember: String)
 
-// See Chat CorDapp Design section of the getting started docs for a description of this flow.
+// このフローの説明については、入門ドキュメントのChat CorDapp Designセクションを参照してください。
 class CreateNewChatFlow: ClientStartableFlow {
 
     private companion object {
@@ -30,35 +30,34 @@ class CreateNewChatFlow: ClientStartableFlow {
     @CordaInject
     lateinit var memberLookup: MemberLookup
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API.
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします。
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
     @CordaInject
     lateinit var notaryLookup: NotaryLookup
 
-    // FlowEngine service is required to run SubFlows.
+    // SubFlowを実行するにはFlowEngineサービスが必要です。
     @CordaInject
     lateinit var flowEngine: FlowEngine
 
     @Suspendable
     override fun call(requestBody: ClientRequestBody): String {
 
-        log.info("CreateNewChatFlow.call() called")
+        log.info("CreateNewChatFlow.call() が呼び出されました")
 
         try {
-            // Obtain the deserialized input arguments to the flow from the requestBody.
+            // requestBodyからフローへのデシリアライズされた入力引数を取得します。
             val flowArgs = requestBody.getRequestBodyAs(jsonMarshallingService, CreateNewChatFlowArgs::class.java)
 
-            // Get MemberInfos for the Vnode running the flow and the otherMember.
-            // Good practice in Kotlin CorDapps is to only throw RuntimeException.
-            // Note, in Java CorDapps only unchecked RuntimeExceptions can be thrown not
-            // declared checked exceptions as this changes the method signature and breaks override.
+            // フローを実行しているVNodeとotherMemberのMemberInfoを取得します。
+            // Kotlin CorDappsの良い習慣は、RuntimeExceptionのみをスローすることです。
+            // 注意：Java CorDappsでは、メソッドのシグネチャを変更してオーバーライドを壊すため、宣言されたチェック済み例外ではなく、チェックされていないRuntimeExceptionのみをスローできます。
             val myInfo = memberLookup.myInfo()
             val otherMember = memberLookup.lookup(MemberX500Name.parse(flowArgs.otherMember)) ?:
-                throw CordaRuntimeException("MemberLookup can't find otherMember specified in flow arguments.")
+                throw CordaRuntimeException("MemberLookupがフロー引数で指定されたotherMemberを見つけられません。")
 
-            // Create the ChatState from the input arguments and member information.
+            // 入力引数とメンバー情報からChatStateを作成します。
             val chatState = ChatState(
                 chatName = flowArgs.chatName,
                 messageFrom = myInfo.name,
@@ -66,10 +65,10 @@ class CreateNewChatFlow: ClientStartableFlow {
                 participants = listOf(myInfo.ledgerKeys.first(), otherMember.ledgerKeys.first())
             )
 
-            // Obtain the notary.
+            // 公証人を取得します。
             val notary = notaryLookup.notaryServices.single()
 
-            // Use UTXOTransactionBuilder to build up the draft transaction.
+            // UTXOTransactionBuilderを使用してドラフトトランザクションを作成します。
             val txBuilder= ledgerService.createTransactionBuilder()
                 .setNotary(notary.name)
                 .setTimeWindowBetween(Instant.now(), Instant.now().plusMillis(Duration.ofDays(1).toMillis()))
@@ -77,21 +76,20 @@ class CreateNewChatFlow: ClientStartableFlow {
                 .addCommand(ChatContract.Create())
                 .addSignatories(chatState.participants)
 
-            // Convert the transaction builder to a UTXOSignedTransaction. Verifies the content of the
-            // UtxoTransactionBuilder and signs the transaction with any required signatories that belong to
-            // the current node.
+            // トランザクションビルダーをUTXOSignedTransactionに変換します。UtxoTransactionBuilderの
+            // 内容を検証し、現在のノードに属する必要な署名者でトランザクションに署名します。
             val signedTransaction = txBuilder.toSignedTransaction()
 
-            // Call FinalizeChatSubFlow which will finalise the transaction.
-            // If successful the flow will return a String of the created transaction id,
-            // if not successful it will return an error message.
+            // トランザクションをファイナライズするFinalizeChatSubFlowを呼び出します。
+            // 成功した場合、フローは作成されたトランザクションIDの文字列を返します。
+            // 成功しなかった場合は、エラーメッセージを返します。
             return flowEngine.subFlow(FinalizeChatSubFlow(signedTransaction, otherMember.name))
 
 
         }
-        // Catch any exceptions, log them and rethrow the exception.
+        // 例外をキャッチし、ログに記録して例外を再スローします。
         catch (e: Exception) {
-            log.warn("Failed to process utxo flow for request body '$requestBody' because:'${e.message}'")
+            log.warn("リクエストボディ '$requestBody' のutxoフローの処理に失敗しました。理由：'${e.message}'")
             throw e
         }
     }
@@ -99,7 +97,7 @@ class CreateNewChatFlow: ClientStartableFlow {
 
 
 /*
-RequestBody for triggering the flow via REST:
+REST経由でフローをトリガーするためのRequestBody：
 {
     "clientRequestId": "create-1",
     "flowClassName": "com.r3.developers.cordapptemplate.utxoexample.workflows.CreateNewChatFlow",

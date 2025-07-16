@@ -8,8 +8,8 @@ import net.corda.v5.ledger.utxo.transaction.UtxoLedgerTransaction
 
 class ChatContract: Contract {
 
-    // Use an internal scoped constant to hold the error messages
-    // This allows the tests to use them, meaning if they are updated you won't need to fix tests just because the wording was updated
+    // エラーメッセージを保持するための内部スコープ定数
+    // これにより、テストでそれらを使用できるようになり、文言が更新されたという理由だけでテストを修正する必要がなくなります
     internal companion object {
 
         const val REQUIRE_SINGLE_COMMAND = "Requires a single command."
@@ -27,18 +27,18 @@ class ChatContract: Contract {
         const val UPDATE_COMMAND_PARTICIPANTS_SHOULD_NOT_CHANGE = "When command is Update participants must not change."
     }
 
-    // Command Class used to indicate that the transaction should start a new chat.
+    // トランザクションが新しいチャットを開始することを示すために使用されるコマンドクラス
     class Create: Command
-    // Command Class used to indicate that the transaction should append a new ChatState to an existing chat.
+    // トランザクションが既存のチャットに新しいChatStateを追加することを示すために使用されるコマンドクラス
     class Update: Command
 
-    // verify() function is used to apply contract rules to the transaction.
+    // verify()関数は、契約ルールをトランザクションに適用するために使用されます
     override fun verify(transaction: UtxoLedgerTransaction) {
 
-        // Ensures that there is only one command in the transaction
+        // トランザクションにコマンドが1つしかないことを保証します
         val command = transaction.commands.singleOrNull() ?: throw CordaRuntimeException(REQUIRE_SINGLE_COMMAND)
 
-        // Applies a universal constraint (applies to all transactions irrespective of command)
+        // ユニバーサル制約を適用します（コマンドに関係なくすべてのトランザクションに適用されます）
         OUTPUT_STATE_SHOULD_ONLY_HAVE_TWO_PARTICIPANTS using {
             val output = transaction.outputContractStates.first() as ChatState
             output.participants.size== 2
@@ -49,14 +49,14 @@ class ChatContract: Contract {
             transaction.signatories.containsAll(output.participants)
         }
 
-        // Switches case based on the command
+        // コマンドに基づいてケースを切り替えます
         when(command) {
-            // Rules applied only to transactions with the Create Command.
+            // Createコマンドを持つトランザクションにのみ適用されるルール
             is Create -> {
                 CREATE_COMMAND_SHOULD_HAVE_NO_INPUT_STATES using (transaction.inputContractStates.isEmpty())
                 CREATE_COMMAND_SHOULD_HAVE_ONLY_ONE_OUTPUT_STATE using (transaction.outputContractStates.size == 1)
             }
-            // Rules applied only to transactions with the Update Command.
+            // Updateコマンドを持つトランザクションにのみ適用されるルール
             is Update -> {
                 UPDATE_COMMAND_SHOULD_HAVE_ONLY_ONE_INPUT_STATE using (transaction.inputContractStates.size == 1)
                 UPDATE_COMMAND_SHOULD_HAVE_ONLY_ONE_OUTPUT_STATE using (transaction.outputContractStates.size == 1)
@@ -74,13 +74,12 @@ class ChatContract: Contract {
         }
     }
 
-    // Helper function to allow writing constraints in the Corda 4 '"text" using (boolean)' style
+    // Corda 4の「「text」using（boolean）」スタイルで制約を記述できるようにするヘルパー関数
     private infix fun String.using(expr: Boolean) {
         if (!expr) throw CordaRuntimeException("Failed requirement: $this")
     }
 
-    // Helper function to allow writing constraints in '"text" using {lambda}' style where the last expression
-    // in the lambda is a boolean.
+    // ラムダの最後の式がブール値である「「text」using {lambda}」スタイルで制約を記述できるようにするヘルパー関数
     private infix fun String.using(expr: () -> Boolean) {
         if (!expr.invoke()) throw CordaRuntimeException("Failed requirement: $this")
     }

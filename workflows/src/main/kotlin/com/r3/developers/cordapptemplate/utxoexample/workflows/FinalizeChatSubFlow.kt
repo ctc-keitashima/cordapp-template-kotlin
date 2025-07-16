@@ -11,9 +11,9 @@ import net.corda.v5.ledger.utxo.UtxoLedgerService
 import net.corda.v5.ledger.utxo.transaction.UtxoSignedTransaction
 import org.slf4j.LoggerFactory
 
-// See Chat CorDapp Design section of the getting started docs for a description of this flow.
+// このフローの説明については、入門ドキュメントのChat CorDapp Designセクションを参照してください。
 
-// @InitiatingFlow declares the protocol which will be used to link the initiator to the responder.
+// @InitiatingFlowは、イニシエーターをレスポンダーにリンクするために使用されるプロトコルを宣言します。
 @InitiatingFlow(protocol = "finalize-chat-protocol")
 class FinalizeChatSubFlow(private val signedTransaction: UtxoSignedTransaction, private val otherMember: MemberX500Name): SubFlow<String> {
 
@@ -21,7 +21,7 @@ class FinalizeChatSubFlow(private val signedTransaction: UtxoSignedTransaction, 
         val log = LoggerFactory.getLogger(this::class.java.enclosingClass)
     }
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API.
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします。
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
@@ -31,35 +31,35 @@ class FinalizeChatSubFlow(private val signedTransaction: UtxoSignedTransaction, 
     @Suspendable
     override fun call(): String {
 
-        log.info("FinalizeChatFlow.call() called")
+        log.info("FinalizeChatFlow.call() が呼び出されました")
 
-            // Initiates a session with the other Member.
-            val session = flowMessaging.initiateFlow(otherMember)
+        // 他のメンバーとのセッションを開始します。
+        val session = flowMessaging.initiateFlow(otherMember)
 
-            return try {
-                // Calls the Corda provided finalise() function which gather signatures from the counterparty,
-                // notarises the transaction and persists the transaction to each party's vault.
-                // On success returns the id of the transaction created. (This is different to the ChatState id)
-                val finalizedSignedTransaction = ledgerService.finalize(
-                    signedTransaction,
-                    listOf(session)
-                )
-                // Returns the transaction id converted to a string.
-                finalizedSignedTransaction.transaction.id.toString().also {
-                    log.info("Success! Response: $it")
-                }
+        return try {
+            // Cordaが提供するfinalise()関数を呼び出します。これは、カウンターパーティから署名を集め、
+            // トランザクションを公証し、各パーティの保管庫にトランザクションを永続化します。
+            // 成功すると、作成されたトランザクションのIDが返されます。（これはChatState IDとは異なります）
+            val finalizedSignedTransaction = ledgerService.finalize(
+                signedTransaction,
+                listOf(session)
+            )
+            // トランザクションIDを文字列に変換して返します。
+            finalizedSignedTransaction.transaction.id.toString().also {
+                log.info("成功！応答： $it")
             }
-            // Soft fails the flow and returns the error message without throwing a flow exception.
-            catch (e: Exception) {
-                log.warn("Finality failed", e)
-                "Finality failed, ${e.message}"
-            }
+        }
+        // フローをソフトに失敗させ、フロー例外をスローせずにエラーメッセージを返します。
+        catch (e: Exception) {
+            log.warn("ファイナリティに失敗しました", e)
+            "ファイナリティに失敗しました, ${e.message}"
+        }
     }
 }
 
-// See Chat CorDapp Design section of the getting started docs for a description of this flow.
+// このフローの説明については、入門ドキュメントのChat CorDapp Designセクションを参照してください。
 
-//@InitiatingBy declares the protocol which will be used to link the initiator to the responder.
+//@InitiatingByは、イニシエーターをレスポンダーにリンクするために使用されるプロトコルを宣言します。
 @InitiatedBy(protocol = "finalize-chat-protocol")
 class FinalizeChatResponderFlow: ResponderFlow {
 
@@ -67,37 +67,36 @@ class FinalizeChatResponderFlow: ResponderFlow {
         val log = LoggerFactory.getLogger(this::class.java.enclosingClass)
     }
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API.
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします。
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
     @Suspendable
     override fun call(session: FlowSession) {
 
-        log.info("FinalizeChatResponderFlow.call() called")
+        log.info("FinalizeChatResponderFlow.call() が呼び出されました")
 
         try {
-            // Calls receiveFinality() function which provides the responder to the finalise() function
-            // in the Initiating Flow. Accepts a lambda validator containing the business logic to decide whether
-            // responder should sign the Transaction.
+            // Initiating Flowのfinalise()関数に応答側を提供するためにreceiveFinality()関数を呼び出します。
+            // 応答側がトランザクションに署名すべきかどうかを決定するためのビジネスロジックを含むラムダバリデーターを受け入れます。
             val finalizedSignedTransaction = ledgerService.receiveFinality(session) { ledgerTransaction ->
 
-                // Note, this exception will only be shown in the logs if Corda Logging is set to debug.
+                // 注意：この例外は、Cordaのロギングがデバッグに設定されている場合にのみログに表示されます。
                 val state = ledgerTransaction.getOutputStates(ChatState::class.java).singleOrNull() ?:
-                    throw CordaRuntimeException("Failed verification - transaction did not have exactly one output ChatState.")
+                    throw CordaRuntimeException("検証に失敗しました - トランザクションにはChatStateの出力が1つだけではありませんでした。")
 
-                // Uses checkForBannedWords() and checkMessageFromMatchesCounterparty() functions
-                // to check whether to sign the transaction.
+                // checkForBannedWords()とcheckMessageFromMatchesCounterparty()関数を使用して、
+                // トランザクションに署名するかどうかを確認します。
                 checkForBannedWords(state.message)
                 checkMessageFromMatchesCounterparty(state, session.counterparty)
 
-                log.info("Verified the transaction- ${ledgerTransaction.id}")
+                log.info("トランザクションを検証しました- ${ledgerTransaction.id}")
             }
-            log.info("Finished responder flow - ${finalizedSignedTransaction.transaction.id}")
+            log.info("レスポンダーフローを終了しました - ${finalizedSignedTransaction.transaction.id}")
         }
-        // Soft fails the flow and log the exception.
+        // フローをソフトに失敗させ、例外をログに記録します。
         catch (e: Exception) {
-            log.warn("Exceptionally finished responder flow", e)
+            log.warn("レスポンダーフローが例外的に終了しました", e)
         }
     }
 }

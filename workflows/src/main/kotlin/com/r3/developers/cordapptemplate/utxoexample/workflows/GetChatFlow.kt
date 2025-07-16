@@ -13,13 +13,13 @@ import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.*
 
-// A class to hold the deserialized arguments required to start the flow.
+// フローを開始するために必要な、デシリアライズされた引数を保持するクラス。
 data class GetChatFlowArgs(val id: UUID, val numberOfRecords: Int)
 
-// A class to pair the messageFrom and message together.
+// messageFromとmessageをペアにするためのクラス。
 data class MessageAndSender(val messageFrom: String, val message: String)
 
-// See Chat CorDapp Design section of the getting started docs for a description of this flow.
+// このフローの説明については、入門ドキュメントのChat CorDapp Designセクションを参照してください。
 class GetChatFlow: ClientStartableFlow {
 
     private companion object {
@@ -29,88 +29,87 @@ class GetChatFlow: ClientStartableFlow {
     @CordaInject
     lateinit var jsonMarshallingService: JsonMarshallingService
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API.
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします。
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
     @Suspendable
     override fun call(requestBody: ClientRequestBody): String {
 
-        log.info("GetChatFlow.call() called")
+        log.info("GetChatFlow.call() が呼び出されました")
 
-        // Obtain the deserialized input arguments to the flow from the requestBody.
+        // requestBodyからフローへのデシリアライズされた入力引数を取得します。
         val flowArgs = requestBody.getRequestBodyAs(jsonMarshallingService, GetChatFlowArgs::class.java)
 
-        // Look up the latest unconsumed ChatState with the given id.
-        // Note, this code brings all unconsumed states back, then filters them.
-        // This is an inefficient way to perform this operation when there are a large number of chats.
-        // Note, you will get this error if you input an id which has no corresponding ChatState (common error).
+        // 指定されたIDを持つ最新の未消費のChatStateを検索します。
+        // 注意：このコードはすべての未消費の状態を取得してからフィルタリングします。
+        // これは、多数のチャットがある場合には非効率な操作です。
+        // 注意：対応するChatStateがないIDを入力すると、このエラーが発生します（よくあるエラー）。
         val states = ledgerService.findUnconsumedStatesByExactType(ChatState::class.java, 100, Instant.now()).results
         val state = states.singleOrNull {it.state.contractState.id == flowArgs.id}
-            ?: throw CordaRuntimeException("Did not find an unique unconsumed ChatState with id ${flowArgs.id}")
+            ?: throw CordaRuntimeException("${flowArgs.id} というIDを持つ一意の未消費のChatStateが見つかりませんでした")
 
-        // Calls resolveMessagesFromBackchain() which retrieves the chat history from the backchain.
+        // バックチェーンからチャット履歴を取得するresolveMessagesFromBackchain()を呼び出します。
         return jsonMarshallingService.format(resolveMessagesFromBackchain(state, flowArgs.numberOfRecords ))
     }
 
-    // resoveMessageFromBackchain() starts at the stateAndRef provided, which represents the unconsumed head of the
-    // backchain for this particular chat, then walks the chain backwards for the number of transaction specified in
-    // the numberOfRecords argument. For each transaction it adds the MessageAndSender representing the
-    // message and who sent it to a list which is then returned.
+    // resoveMessageFromBackchain()は、提供されたstateAndRefから開始します。これは、この特定のチャットのバックチェーンの
+    // 未消費のヘッドを表し、numberOfRecords引数で指定されたトランザクションの数だけチェーンを後方にたどります。
+    // 各トランザクションについて、メッセージと送信者を表すMessageAndSenderをリストに追加し、そのリストを返します。
     @Suspendable
     private fun resolveMessagesFromBackchain(stateAndRef: StateAndRef<ChatState>, numberOfRecords: Int): List<MessageAndSender>{
 
-        // Set up a MutableList to collect the MessageAndSender(s)
+        // MessageAndSenderを収集するためのMutableListを設定します。
         val messages = mutableListOf<MessageAndSender>()
 
-        // Set up initial conditions for walking the backchain.
+        // バックチェーンをたどるための初期条件を設定します。
         var currentStateAndRef = stateAndRef
         var recordsToFetch = numberOfRecords
         var moreBackchain = true
 
-        // Continue to loop until the start of the backchain or enough records have been retrieved.
+        // バックチェーンの開始まで、または十分なレコードが取得されるまでループを続けます。
         while (moreBackchain) {
 
-            // Obtain the transaction id from the current StateAndRef and fetch the transaction from the vault.
+            // 現在のStateAndRefからトランザクションIDを取得し、保管庫からトランザクションを取得します。
             val transactionId = currentStateAndRef.ref.transactionId
             val transaction = ledgerService.findLedgerTransaction(transactionId)
-                ?: throw CordaRuntimeException("Transaction $transactionId not found.")
+                ?: throw CordaRuntimeException("トランザクション $transactionId が見つかりません。")
 
-            // Get the output state from the transaction and use it to create a MessageAndSender Object which
-            // is appended to the mutable list.
+            // トランザクションから出力状態を取得し、それを使用してMessageAndSenderオブジェクトを作成し、
+            // 可変リストに追加します。
             val output = transaction.getOutputStates(ChatState::class.java).singleOrNull()
-                ?: throw CordaRuntimeException("Expecting one and only one ChatState output for transaction $transactionId.")
+                ?: throw CordaRuntimeException("トランザクション $transactionId にはChatState出力が1つだけ必要です。")
             messages.add(MessageAndSender(output.messageFrom.toString(), output.message))
-            // Decrement the number of records to fetch.
+            // 取得するレコードの数をデクリメントします。
             recordsToFetch--
 
-            // Get the reference to the input states.
+            // 入力状態への参照を取得します。
             val inputStateAndRefs = transaction.inputStateAndRefs
 
-            // Check if there are no more input states (start of chain) or we have retrieved enough records.
-            // Check the transaction is not malformed by having too many input states.
-            // Set the currentStateAndRef to the input StateAndRef, then repeat the loop.
+            // 入力状態がこれ以上ないか（チェーンの開始）、または十分なレコードを取得したかを確認します。
+            // トランザクションに入力状態が多すぎて不正な形式になっていないかを確認します。
+            // currentStateAndRefを入力StateAndRefに設定し、ループを繰り返します。
             if (inputStateAndRefs.isEmpty() || recordsToFetch == 0) {
                 moreBackchain = false
             } else if (inputStateAndRefs.size > 1) {
-                throw CordaRuntimeException("More than one input state found for transaction $transactionId.")
+                throw CordaRuntimeException("トランザクション $transactionId に複数の入力状態が見つかりました。")
             } else {
                 @Suppress("UNCHECKED_CAST")
                 currentStateAndRef = inputStateAndRefs.single() as StateAndRef<ChatState>
             }
         }
-     // Convert to an immutable List.
+     // 不変リストに変換します。
      return messages.toList()
     }
 }
 
 /*
-RequestBody for triggering the flow via REST:
+REST経由でフローをトリガーするためのRequestBody：
 {
     "clientRequestId": "get-1",
     "flowClassName": "com.r3.developers.cordapptemplate.utxoexample.workflows.GetChatFlow",
     "requestBody": {
-        "id":"** fill in id **",
+        "id":"** IDを入力してください **",
         "numberOfRecords":"4"
     }
 }

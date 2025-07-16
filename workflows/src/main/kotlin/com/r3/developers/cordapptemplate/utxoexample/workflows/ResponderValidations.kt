@@ -5,20 +5,25 @@ import net.corda.v5.base.annotations.Suspendable
 import net.corda.v5.base.exceptions.CordaRuntimeException
 import net.corda.v5.base.types.MemberX500Name
 
-// Note, these exceptions will only be visible in the logs if Corda logging is set to debug.
+// 注意：これらの例外は、Cordaのロギングがデバッグに設定されている場合にのみログに表示されます。
 
-// Checks that the message does not contain banned words and throws and exception if it does.
+// メッセージに禁止用語が含まれていないか確認し、含まれている場合は例外をスローします。
 @Suspendable
 fun checkForBannedWords(str: String) {
     val bannedWords = listOf("banana", "apple", "pear")
-    if (bannedWords.any { str.contains(it) })
-        throw CordaRuntimeException("Failed verification - message contains banned words")
+    if (bannedWords.any { str.contains(it) }) {
+        throw CordaRuntimeException("検証に失敗しました - メッセージに禁止用語が含まれています")
+    }
 }
 
-// Checks that the messageFrom field in the ChatState matches the initiators (otherMember)
-// memberX500Name, if not it throws an exception.
+// ChatStateのmessageFromフィールドがイニシエーター（otherMember）の
+// memberX500Nameと一致するかどうかを確認し、一致しない場合は例外をスローします。
 @Suspendable
-fun checkMessageFromMatchesCounterparty(state: ChatState, otherMember: MemberX500Name) {
-   if( state.messageFrom != otherMember)
-       throw CordaRuntimeException("Failed verification - messageFrom does not equal flow initiator memberX500Name")
+fun checkMessageFromMatchesCounterparty(
+    state: ChatState,
+    otherMember: MemberX500Name,
+) {
+    if (state.messageFrom != otherMember) {
+        throw CordaRuntimeException("検証に失敗しました - messageFromがフローイニシエーターのmemberX500Nameと一致しません")
+    }
 }

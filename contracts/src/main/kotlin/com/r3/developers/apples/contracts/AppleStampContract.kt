@@ -27,5 +27,4 @@ class AppleStampContract : Contract {
             }
         }
     }
-
 }

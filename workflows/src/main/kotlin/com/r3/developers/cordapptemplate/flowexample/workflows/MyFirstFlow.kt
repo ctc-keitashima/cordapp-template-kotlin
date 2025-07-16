@@ -1,6 +1,11 @@
 package com.r3.developers.cordapptemplate.flowexample.workflows
 
-import net.corda.v5.application.flows.*
+import net.corda.v5.application.flows.ClientRequestBody
+import net.corda.v5.application.flows.ClientStartableFlow
+import net.corda.v5.application.flows.CordaInject
+import net.corda.v5.application.flows.InitiatedBy
+import net.corda.v5.application.flows.InitiatingFlow
+import net.corda.v5.application.flows.ResponderFlow
 import net.corda.v5.application.marshalling.JsonMarshallingService
 import net.corda.v5.application.membership.MemberLookup
 import net.corda.v5.application.messaging.FlowMessaging
@@ -10,140 +15,139 @@ import net.corda.v5.base.annotations.Suspendable
 import net.corda.v5.base.types.MemberX500Name
 import org.slf4j.LoggerFactory
 
-// A class to hold the deserialized arguments required to start the flow.
-class MyFirstFlowStartArgs(val otherMember: MemberX500Name)
+// フローを開始するために必要な、デシリアライズされた引数を保持するクラス。
+class MyFirstFlowStartArgs(
+    val otherMember: MemberX500Name,
+)
 
-
-// A class which will contain a message, It must be marked with @CordaSerializable for Corda
-// to be able to send from one virtual node to another.
+// メッセージを格納するクラス。CordaがVirtual Node（仮想ノード）間でデータを送受信できるようにするためには、
+// @CordaSerializable アノテーションを付与する必要があります。
 @CordaSerializable
-class Message(val sender: MemberX500Name, val message: String)
+class Message(
+    val sender: MemberX500Name,
+    val message: String,
+)
 
-
-// MyFirstFlow is an initiating flow, it's corresponding responder flow is called MyFirstFlowResponder (defined below)
-// to link the two sides of the flow together they need to have the same protocol.
+// MyFirstFlowはイニシエートフロー（処理を開始する側のフロー）です。
+// 対応するレスポンダーフロー（応答する側のフロー）は MyFirstFlowResponder（下記で定義）です。
+// 両者を連携させるためには、同じプロトコル名を指定する必要があります。
+// MyFirstFlowは ClientStartableFlow を継承します。
+// これにより、Corda はこのフローがクライアントからのREST API呼び出しによって開始できることを認識します。
 @InitiatingFlow(protocol = "my-first-flow")
-// MyFirstFlow should inherit from ClientStartableFlow, which tells Corda it can be started via an REST call from a client
-class MyFirstFlow: ClientStartableFlow {
-
-    // It is useful to be able to log messages from the flows for debugging.
+class MyFirstFlow : ClientStartableFlow {
+    // デバッグのためにフローからログメッセージを出力できると便利です。
     private companion object {
         val log = LoggerFactory.getLogger(this::class.java.enclosingClass)
     }
 
-    // Corda has a set of injectable services which are injected into the flow at runtime.
-    // Flows declare them with @CordaInjectable, then the flows have access to their services.
+    // Cordaには、実行時にフローにインジェクト（注入）される一連のサービスがあります。
+    // フローは @CordaInject アノテーションでこれらのサービスを宣言し、利用可能にします。
 
-    // JsonMarshallingService provides a Service for manipulating json
+    // JsonMarshallingService は JSON を操作するためのサービスを提供します。
     @CordaInject
     lateinit var jsonMarshallingService: JsonMarshallingService
 
-    // FlowMessaging provides a service for establishing flow sessions between Virtual Nodes and
-    // sending and receiving payloads between them
+    // FlowMessaging は、Virtual Node間でフローセッションを確立し、
+    // ペイロードを送受信するためのサービスを提供します。
     @CordaInject
     lateinit var flowMessaging: FlowMessaging
 
-    // MemberLookup provides a service for looking up information about members of the Virtual Network which
-    // this CorDapp is operating in.
+    // MemberLookup は、このCorDappが動作している仮想ネットワークの
+    // メンバー情報を検索するためのサービスを提供します。
     @CordaInject
     lateinit var memberLookup: MemberLookup
 
-
-
-    // When a flow is invoked its call() method is called.
-    // call() methods must be marked as @Suspendable, this allows Corda to pause mid-execution to wait
-    // for a response from the other flows and services.
+    // フローが呼び出されると、その call() メソッドが実行されます。
+    // call() メソッドには @Suspendable アノテーションを付与する必要があります。これにより、Cordaは
+    // 他のフローやサービスからの応答を待つために、実行を一時停止（中断）できます。
     @Suspendable
     override fun call(requestBody: ClientRequestBody): String {
-
-        // Useful logging to follow what's happening in the console or logs
+        // コンソールやログで何が起こっているかを追跡するための便利なロギングです。
         log.info("MFF: MyFirstFlow.call() called")
 
-        // Show the requestBody in the logs - this can be used to help establish the format for starting a flow on corda
+        // requestBodyをログに出力します - これはCordaでフローを開始するためのフォーマットを確認するのに役立ちます。
         log.info("MFF: requestBody: ${requestBody.getRequestBody()}")
 
-        // Deserialize the Json requestBody into the MyfirstFlowStartArgs class using the JsonSerialisation Service
+        // JsonMarshallingService を使用して、JSON形式の requestBody を MyFirstFlowStartArgs クラスにデシリアライズします。
         val flowArgs = requestBody.getRequestBodyAs(jsonMarshallingService, MyFirstFlowStartArgs::class.java)
 
-        // Obtain the MemberX500Name of counterparty
+        // 通信相手の MemberX500Name を取得します。
         val otherMember = flowArgs.otherMember
 
-        // Get our identity from the MemberLookup service.
+        // MemberLookup サービスから自身の情報を取得します。
         val ourIdentity = memberLookup.myInfo().name
 
-        // Create the message payload using the MessageClass we defined.
-        val message = Message(otherMember, "Hello from $ourIdentity.")
+        // 定義した Message クラスを使って、メッセージペイロードを作成します。
+        val message = Message(ourIdentity, "Hello from $ourIdentity.")
 
-        // Log the message to be sent.
+        // 送信するメッセージをログに出力します。
         log.info("MFF: message.message: ${message.message}")
 
-        // Start a flow session with the otherMember using the FlowMessaging service
-        // The otherMember's Virtual Node will run the corresponding MyFirstFlowResponder responder flow
+        // FlowMessaging サービスを使って、通信相手（otherMember）とのフローセッションを開始します。
+        // これにより、相手方のVirtual Nodeで対応する MyFirstFlowResponder フローが実行されます。
         val session = flowMessaging.initiateFlow(otherMember)
 
-        // Send the Payload using the send method on the session to the MyFirstFlowResponder Responder flow
-        session.send(message)
+        // セッションの send メソッドを使って、ペイロードを MyFirstFlowResponder フローに送信 & レスポンダーフローから応答を受信します。
+        val response = session.sendAndReceive(Message::class.java, message)
 
-        // Receive a response from the Responder flow
-        val response = session.receive(Message::class.java)
-
-        // The return value of a ClientStartableFlow must always be a String, this String will be passed
-        // back as the REST response when the status of the flow is queried on Corda.
+        // ClientStartableFlow の戻り値は常に String 型でなければなりません。この文字列は、
+        // Cordaに対してフローのステータスを問い合わせた際のRESTレスポンスとして返されます。
         return response.message
     }
 }
 
-// MyFirstFlowResponder is a responder flow, it's corresponding initiating flow is called MyFirstFlow (defined above)
-// to link the two sides of the flow together they need to have the same protocol.
+// MyFirstFlowResponder はレスポンダーフローです。
+// 対応するイニシエートフローは MyFirstFlow（上記で定義）です。
+// 両者を連携させるためには、同じプロトコル名を指定する必要があります。
+// レスポンダーフローは ResponderFlow を継承する必要があります。
 @InitiatedBy(protocol = "my-first-flow")
-// Responder flows must inherit from ResponderFlow
-class MyFirstFlowResponder: ResponderFlow {
-
-    // It is useful to be able to log messages from the flows for debugging.
+class MyFirstFlowResponder : ResponderFlow {
+    // デバッグのためにフローからログメッセージを出力できると便利です。
     private companion object {
         val log = LoggerFactory.getLogger(this::class.java.enclosingClass)
     }
 
-    // MemberLookup provides a service for looking up information about members of the Virtual Network which
-    // this CorDapp is operating in.
+    // MemberLookup は、このCorDappが動作している仮想ネットワークの
+    // メンバー情報を検索するためのサービスを提供します。
     @CordaInject
     lateinit var memberLookup: MemberLookup
 
-
-    // Responder flows are invoked when an initiating flow makes a call via a session set up with the Virtual
-    // node hosting the Responder flow. When a responder flow is invoked, its call() method is called.
-    // call() methods must be marked as @Suspendable, this allows Corda to pause mid-execution to wait
-    // for a response from the other flows and services/
-    // The Call method has the flow session passed in as a parameter by Corda so the session is available to
-    // responder flow code, you don't need to inject the FlowMessaging service.
+    // レスポンダーフローは、イニシエートフローがセッションを介して呼び出しを行ったときに起動されます。
+    // レスポンダーフローが起動されると、その call() メソッドが実行されます。
+    // call() メソッドには @Suspendable アノテーションを付与する必要があります。
+    // これにより、Cordaは他のフローやサービスからの応答を待つために、実行を一時停止できます。
+    // call() メソッドには、Cordaによってフローセッションがパラメータとして渡されるため、
+    // FlowMessagingサービスをインジェクトする必要はありません。
     @Suspendable
     override fun call(session: FlowSession) {
-
-        // Useful logging to follow what's happening in the console or logs
+        // コンソールやログで何が起こっているかを追跡するための便利なロギングです。
         log.info("MFF: MyFirstResponderFlow.call() called")
 
-        // Receive the payload and deserialize it into a Message class
+        // ペイロードを受信し、Message クラスにデシリアライズします。
         val receivedMessage = session.receive(Message::class.java)
 
-        // Log the message as a proxy for performing some useful operation on it.
+        // 受信したメッセージに対して何らかの有用な操作を行う代わりに、ここではログに出力します。
         log.info("MFF: Message received from ${receivedMessage.sender}: ${receivedMessage.message} ")
 
-        // Get our identity from the MemberLookup service.
+        // MemberLookup サービスから自身の情報を取得します。
         val ourIdentity = memberLookup.myInfo().name
 
-        // Create a response to greet the sender
-        val response = Message(ourIdentity,
-            "Hello ${session.counterparty.commonName}, best wishes from ${ourIdentity.commonName}")
+        // 送信者への挨拶として、応答メッセージを作成します。
+        val response =
+            Message(
+                ourIdentity,
+                "Hello ${session.counterparty.commonName}, best wishes from ${ourIdentity.commonName}",
+            )
 
-        // Log the response to be sent.
+        // 送信する応答をログに出力します。
         log.info("MFF: response.message: ${response.message}")
 
-        // Send the response via the send method on the flow session
+        // フローセッションの send メソッドを使って、応答を送信します。
         session.send(response)
     }
 }
 /*
-RequestBody for triggering the flow via REST:
+REST経由でこのフローをトリガーするためのRequestBodyサンプル:
 {
     "clientRequestId": "r1",
     "flowClassName": "com.r3.developers.cordapptemplate.flowexample.workflows.MyFirstFlow",
@@ -151,4 +155,4 @@ RequestBody for triggering the flow via REST:
         "otherMember":"CN=Bob, OU=Test Dept, O=R3, L=London, C=GB"
         }
 }
- */
+*/

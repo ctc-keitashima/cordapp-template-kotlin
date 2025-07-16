@@ -12,8 +12,7 @@ class AppleStamp(
     val stampDesc: String,
     val issuer: PublicKey,
     val holder: PublicKey,
-    private val participants: List<PublicKey>
+    private val participants: List<PublicKey>,
 ) : ContractState {
     override fun getParticipants(): List<PublicKey> = participants
-
 }

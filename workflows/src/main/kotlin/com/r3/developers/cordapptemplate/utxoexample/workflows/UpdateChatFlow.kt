@@ -13,11 +13,11 @@ import java.time.Duration
 import java.time.Instant
 import java.util.*
 
-// A class to hold the deserialized arguments required to start the flow.
+// フローを開始するために必要な、デシリアライズされた引数を保持するクラス。
 data class UpdateChatFlowArgs(val id: UUID, val message: String)
 
 
-// See Chat CorDapp Design section of the getting started docs for a description of this flow.
+// このフローの説明については、入門ドキュメントのChat CorDapp Designセクションを参照してください。
 class UpdateChatFlow: ClientStartableFlow {
 
     private companion object {
@@ -30,44 +30,44 @@ class UpdateChatFlow: ClientStartableFlow {
     @CordaInject
     lateinit var memberLookup: MemberLookup
 
-    // Injects the UtxoLedgerService to enable the flow to make use of the Ledger API.
+    // フローが台帳APIを利用できるようにするためにUtxoLedgerServiceをインジェクトします。
     @CordaInject
     lateinit var ledgerService: UtxoLedgerService
 
-    // FlowEngine service is required to run SubFlows.
+    // SubFlowを実行するにはFlowEngineサービスが必要です。
     @CordaInject
     lateinit var flowEngine: FlowEngine
 
     @Suspendable
     override fun call(requestBody: ClientRequestBody): String {
 
-        log.info("UpdateNewChatFlow.call() called")
+        log.info("UpdateNewChatFlow.call() が呼び出されました")
 
         try {
-            // Obtain the deserialized input arguments to the flow from the requestBody.
+            // requestBodyからフローへのデシリアライズされた入力引数を取得します。
             val flowArgs = requestBody.getRequestBodyAs(jsonMarshallingService, UpdateChatFlowArgs::class.java)
 
-            // Look up the latest unconsumed ChatState with the given id.
-            // Note, this code brings all unconsumed states back, then filters them.
-            // This is an inefficient way to perform this operation when there are a large number of chats.
-            // Note, you will get this error if you input an id which has no corresponding ChatState (common error).
+            // 指定されたIDを持つ最新の未消費のChatStateを検索します。
+            // 注意：このコードはすべての未消費の状態を取得してからフィルタリングします。
+            // これは、多数のチャットがある場合には非効率な操作です。
+            // 注意：対応するChatStateがないIDを入力すると、このエラーが発生します（よくあるエラー）。
             val stateAndRef = ledgerService.findUnconsumedStatesByExactType(ChatState::class.java, 100, Instant.now()).results.singleOrNull {
                 it.state.contractState.id == flowArgs.id
-            } ?: throw CordaRuntimeException("Multiple or zero Chat states with id ${flowArgs.id} found.")
+            } ?: throw CordaRuntimeException("${flowArgs.id} というIDを持つ複数のまたはゼロのチャット状態が見つかりました。")
 
-            // Get MemberInfos for the Vnode running the flow and the otherMember.
+            // フローを実行しているVnodeとotherMemberのMemberInfoを取得します。
             val myInfo = memberLookup.myInfo()
             val state = stateAndRef.state.contractState
 
             val members = state.participants.map {
-                memberLookup.lookup(it) ?: throw CordaRuntimeException("Member not found from public key $it.")}
+                memberLookup.lookup(it) ?: throw CordaRuntimeException("公開鍵 $it からメンバーが見つかりませんでした。")}
             val otherMember = (members - myInfo).singleOrNull()
-                ?: throw CordaRuntimeException("Should be only one participant other than the initiator.")
+                ?: throw CordaRuntimeException("イニシエーター以外の参加者は1人だけである必要があります。")
 
-            // Create a new ChatState using the updateMessage helper function.
+            // updateMessageヘルパー関数を使用して新しいChatStateを作成します。
             val newChatState = state.updateMessage(myInfo.name, flowArgs.message)
 
-            // Use UTXOTransactionBuilder to build up the draft transaction.
+            // UTXOTransactionBuilderを使用してドラフトトランザクションを作成します。
             val txBuilder= ledgerService.createTransactionBuilder()
                 .setNotary(stateAndRef.state.notaryName)
                 .setTimeWindowBetween(Instant.now(), Instant.now().plusMillis(Duration.ofDays(1).toMillis()))
@@ -76,33 +76,32 @@ class UpdateChatFlow: ClientStartableFlow {
                 .addCommand(ChatContract.Update())
                 .addSignatories(newChatState.participants)
 
-            // Convert the transaction builder to a UTXOSignedTransaction. Verifies the content of the
-            // UtxoTransactionBuilder and signs the transaction with any required signatories that belong to
-            // the current node.
+            // トランザクションビルダーをUTXOSignedTransactionに変換します。UtxoTransactionBuilderの
+            // 内容を検証し、現在のノードに属する必要な署名者でトランザクションに署名します。
             val signedTransaction = txBuilder.toSignedTransaction()
 
-            // Call FinalizeChatSubFlow which will finalise the transaction.
-            // If successful the flow will return a String of the created transaction id,
-            // if not successful it will return an error message.
+            // トランザクションをファイナライズするFinalizeChatSubFlowを呼び出します。
+            // 成功した場合、フローは作成されたトランザクションIDの文字列を返します。
+            // 成功しなかった場合は、エラーメッセージを返します。
             return flowEngine.subFlow(FinalizeChatSubFlow(signedTransaction, otherMember.name))
 
 
         }
-        // Catch any exceptions, log them and rethrow the exception.
+        // 例外をキャッチし、ログに記録して例外を再スローします。
         catch (e: Exception) {
-            log.warn("Failed to process utxo flow for request body '$requestBody' because:'${e.message}'")
+            log.warn("リクエストボディ '$requestBody' のutxoフローの処理に失敗しました。理由：'${e.message}'")
             throw e
         }
     }
 }
 
 /*
-RequestBody for triggering the flow via REST:
+REST経由でフローをトリガーするためのRequestBody：
 {
     "clientRequestId": "update-2",
     "flowClassName": "com.r3.developers.cordapptemplate.utxoexample.workflows.UpdateChatFlow",
     "requestBody": {
-        "id":"** fill in id **",
+        "id":"** IDを入力してください **",
         "message": "How are you today?"
         }
 }

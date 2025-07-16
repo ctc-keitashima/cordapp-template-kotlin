@@ -8,30 +8,29 @@ import java.security.PublicKey
 import java.util.*
 
 
-// The ChatState represents data stored on ledger. A chat consists of a linear series of messages between two
-// participants and is represented by a UUID. Any given pair of participants can have multiple chats
-// Each ChatState stores one message between the two participants in the chat. The backchain of ChatStates
-// represents the history of the chat.
+// ChatStateは台帳に保存されるデータを表します。チャットは2人の参加者間の一連のメッセージで構成され、
+// UUIDで表されます。任意の2人の参加者のペアは、複数のチャットを持つことができます。
+// 各ChatStateは、チャット内の2人の参加者間の1つのメッセージを保存します。ChatStateのバックチェーンは、
+// チャットの履歴を表します。
 
 @BelongsToContract(ChatContract::class)
 data class ChatState(
-    // Unique identifier for the chat.
+    // チャットの一意の識別子。
     val id : UUID = UUID.randomUUID(),
-    // Non-unique name for the chat.
+    // チャットの一意でない名前。
     val chatName: String,
-    // The MemberX500Name of the participant who sent the message.
+    // メッセージを送信した参加者のMemberX500Name。
     val messageFrom: MemberX500Name,
-    // The message
+    // メッセージ
     val message: String,
-    // The participants to the chat, represented by their public key.
+    // チャットの参加者。公開鍵で表されます。
     private val participants: List<PublicKey>) : ContractState {
 
     override fun getParticipants(): List<PublicKey> {
         return participants
     }
 
-    // Helper function to create a new ChatState from the previous (input) ChatState.
+    // 前の（入力）ChatStateから新しいChatStateを作成するためのヘルパー関数。
     fun updateMessage(messageFrom: MemberX500Name, message: String) =
         copy(messageFrom = messageFrom, message = message)
 }
-
