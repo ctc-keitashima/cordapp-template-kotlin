@@ -1,31 +1,33 @@
 package com.r3.developers.apples.workflows
 
-import com.r3.developers.apples.contracts.AppleCommands
-import com.r3.developers.apples.states.AppleStamp
-import net.corda.v5.application.flows.ClientRequestBody
-import net.corda.v5.application.flows.ClientStartableFlow
-import net.corda.v5.application.flows.CordaInject
-import net.corda.v5.application.flows.InitiatingFlow
+import net.corda.v5.application.flows.*
+import net.corda.v5.base.annotations.Suspendable
+import net.corda.v5.application.messaging.FlowMessaging
+import net.corda.v5.base.exceptions.CordaRuntimeException
 import net.corda.v5.application.marshalling.JsonMarshallingService
 import net.corda.v5.application.membership.MemberLookup
-import net.corda.v5.application.messaging.FlowMessaging
-import net.corda.v5.base.annotations.Suspendable
-import net.corda.v5.base.types.MemberX500Name
-import net.corda.v5.ledger.common.NotaryLookup
 import net.corda.v5.ledger.utxo.UtxoLedgerService
+import net.corda.v5.ledger.common.NotaryLookup
+import net.corda.v5.base.types.MemberX500Name
+
+import com.r3.developers.apples.states.AppleStamp
+import com.r3.developers.apples.contracts.AppleCommands
+
+import java.util.UUID
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.UUID
 
+data class CreateAndIssueAppleStampRequest(
+    val stampDescription: String,   // 説明文
+    val holder: MemberX500Name,     // リンゴ引換券の所有者（つまり、引換券を渡す相手）
+)
+
+/* 
+    AppleStamp（リンゴ引換券） を作成する
+    作成したリンゴ引換券は、即座に相手に渡す
+*/
 @InitiatingFlow(protocol = "create-and-issue-apple-stamp")
-class CreateAndIssueAppleStampFlow : ClientStartableFlow {
-
-    internal data class CreateAndIssueAppleStampRequest(
-        val stampDescription: String,
-        val holder: MemberX500Name,
-        val notary: MemberX500Name
-    )
-
+class CreateAndIssueAppleStampFlow : ClientStartableFlow{
     @CordaInject
     lateinit var flowMessaging: FlowMessaging
 
@@ -49,22 +51,27 @@ class CreateAndIssueAppleStampFlow : ClientStartableFlow {
         val stampDescription = request.stampDescription
         val holderName = request.holder
 
-        val notaryInfo = notaryLookup.lookup(request.notary)
-            ?: throw IllegalArgumentException("Notary ${request.notary} not found")
+        // Retrieve the notaries public key (this will change)
+        val notaryInfo = notaryLookup.notaryServices.single()
 
+        // 発行者は私
         val issuer = memberLookup.myInfo().ledgerKeys.first()
-        val holder = memberLookup.lookup(holderName)?.ledgerKeys?.first()
-            ?: throw IllegalArgumentException("The holder $holderName does not exist within the network")
 
-        // Building the output AppleStamp state
+        // リンゴ引換券の渡し先はAPI引数のものを利用
+        val holder = memberLookup.lookup(holderName)
+            ?.let { it.ledgerKeys.first() }
+            ?: throw IllegalArgumentException("The holder $holderName does not exist within the network")
+    
+        // リンゴ引換券の状態を作成
         val newStamp = AppleStamp(
             id = UUID.randomUUID(),
             stampDesc = stampDescription,
             issuer = issuer,
             holder = holder,
-            participants = listOf(issuer, holder)
+            participants = listOf(issuer, holder)   // 引換券の関係者は、発行者と渡す人の２名
         )
 
+        // トランザクションを作成
         val transaction = utxoLedgerService.createTransactionBuilder()
             .setNotary(notaryInfo.name)
             .addOutputState(newStamp)
@@ -73,11 +80,12 @@ class CreateAndIssueAppleStampFlow : ClientStartableFlow {
             .addSignatories(listOf(issuer, holder))
             .toSignedTransaction()
 
+        // トランザクションを決定（ファイナライズ）するために、取引相手とのセッションを開始
         val session = flowMessaging.initiateFlow(holderName)
 
         return try {
-            // Send the transaction and state to the counterparty and let them sign it
-            // Then notarise and record the transaction in both parties' vaults.
+            // トランザクションを決定（ファイナライズ）する
+            // この処理の中で、フレームワークがレスポンダーに送信して応答を待つ処理をする
             utxoLedgerService.finalize(transaction, listOf(session))
             newStamp.id.toString()
         } catch (e: Exception) {

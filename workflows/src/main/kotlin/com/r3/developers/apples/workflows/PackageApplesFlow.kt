@@ -8,15 +8,14 @@ import net.corda.v5.application.flows.ClientStartableFlow
 import net.corda.v5.application.marshalling.JsonMarshallingService
 import net.corda.v5.application.membership.MemberLookup
 import net.corda.v5.base.annotations.Suspendable
-import net.corda.v5.base.types.MemberX500Name
 import net.corda.v5.ledger.common.NotaryLookup
 import net.corda.v5.ledger.utxo.UtxoLedgerService
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class PackageApplesFlow : ClientStartableFlow {
+data class PackApplesRequest(val appleDescription: String, val weight: Int)
 
-    internal data class PackApplesRequest(val appleDescription: String, val weight: Int, val notary: MemberX500Name)
+class PackageApplesFlow : ClientStartableFlow {
 
     @CordaInject
     lateinit var jsonMarshallingService: JsonMarshallingService
@@ -35,9 +34,8 @@ class PackageApplesFlow : ClientStartableFlow {
         val request = requestBody.getRequestBodyAs(jsonMarshallingService, PackApplesRequest::class.java)
         val appleDescription = request.appleDescription
         val weight = request.weight
-        val notary = notaryLookup.lookup(request.notary)
-            ?: throw IllegalArgumentException("Notary ${request.notary} not found")
-        val myKey = memberLookup.myInfo().ledgerKeys.first()
+        val notary = notaryLookup.notaryServices.single()
+        val myKey = memberLookup.myInfo().let { it.ledgerKeys.first() }
 
         // Building the output BasketOfApples state
         val basket = BasketOfApples(
@@ -60,7 +58,7 @@ class PackageApplesFlow : ClientStartableFlow {
         return try {
             // Record the transaction, no sessions are passed in as the transaction is only being
             // recorded locally
-            utxoLedgerService.finalize(transaction, emptyList()).transaction.id.toString()
+            utxoLedgerService.finalize(transaction, emptyList()).toString()
         } catch (e: Exception) {
             "Flow failed, message: ${e.message}"
         }

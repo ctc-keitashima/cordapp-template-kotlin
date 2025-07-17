@@ -11,8 +11,8 @@ class BasketOfApples(
     val farm: PublicKey,
     val owner: PublicKey,
     val weight: Int,
-    private val participants: List<PublicKey>
-) : ContractState {
+    private val participants: List<PublicKey>,
+) : ContractState {    
     override fun getParticipants(): List<PublicKey> = participants
 
     fun changeOwner(buyer: PublicKey): BasketOfApples {

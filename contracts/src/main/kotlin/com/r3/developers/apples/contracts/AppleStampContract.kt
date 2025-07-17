@@ -1,6 +1,7 @@
 package com.r3.developers.apples.contracts
 
 import com.r3.developers.apples.states.AppleStamp
+import com.r3.developers.apples.contracts.AppleCommands
 import net.corda.v5.ledger.utxo.Contract
 import net.corda.v5.ledger.utxo.transaction.UtxoLedgerTransaction
 
@@ -10,16 +11,24 @@ class AppleStampContract : Contract {
         // Verify the transaction according to the intention of the transaction
         when (val command = transaction.commands.first()) {
             is AppleCommands.Issue -> {
-                val output = transaction.getOutputStates(AppleStamp::class.java).first()
-                require(transaction.outputContractStates.size == 1) {
+                val outputs = transaction.getOutputStates(AppleStamp::class.java)
+                require(outputs.size == 1) {
                     "This transaction should only have one AppleStamp state as output"
                 }
+                val output = outputs.single()
                 require(output.stampDesc.isNotBlank()) {
                     "The output AppleStamp state should have clear description of the type of redeemable goods"
                 }
             }
             is AppleCommands.Redeem -> {
-                // Transaction verification will happen in BasketOfApplesContract
+                val inputs = transaction.getInputStates(AppleStamp::class.java)
+                require(inputs.size == 1) {
+                    "This transaction should only have one AppleStamp state as input"
+                }
+                val input = inputs.single()
+                require(input.holder in transaction.signatories) {
+                    "The holder of the input AppleStamp state must be a signatory to the transaction"
+                }
             }
             else -> {
                 // Unrecognised Command type

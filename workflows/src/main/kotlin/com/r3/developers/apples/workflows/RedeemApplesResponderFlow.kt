@@ -9,14 +9,13 @@ import net.corda.v5.ledger.utxo.UtxoLedgerService
 
 @InitiatedBy(protocol = "redeem-apples")
 class RedeemApplesResponderFlow : ResponderFlow {
-
     @CordaInject
     lateinit var utxoLedgerService: UtxoLedgerService
 
     @Suspendable
     override fun call(session: FlowSession) {
         // Receive, verify, validate, sign and record the transaction sent from the initiator
-        utxoLedgerService.receiveFinality(session) {
+        utxoLedgerService.receiveFinality(session) { _ ->
             /*
              * [receiveFinality] will automatically verify the transaction and its signatures before signing it.
              * However, just because a transaction is contractually valid doesn't mean we necessarily want to sign.
